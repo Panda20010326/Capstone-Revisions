@@ -377,6 +377,7 @@ ranked_jobs = results["ranked_jobs"]
 preferred_city = results["preferred_city"]
 housing_df = results["housing_df"]
 
+st.write("DEBUG — pipeline_results in session_state:", "pipeline_results" in st.session_state)
 st.divider()
 st.header("Your results")
 
