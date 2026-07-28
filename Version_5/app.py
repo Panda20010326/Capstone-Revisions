@@ -471,11 +471,6 @@ st.divider()
 # ---------------------------------------------------------------------------
 st.subheader("Job locations")
 
-# ---------------------------------------------------------------------------
-# Folium interactive map
-# ---------------------------------------------------------------------------
-st.subheader("Job locations")
-
 geo_jobs = ranked_jobs.dropna(subset=["latitude", "longitude"]) if "latitude" in ranked_jobs.columns else pd.DataFrame()
 
 if geo_jobs.empty:
