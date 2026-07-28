@@ -255,9 +255,9 @@ with st.form("profile_form"):
 
     submitted = st.form_submit_button("Run pipeline", type="primary", use_container_width=True)
 
-if not submitted:
-    st.info("Fill out the form above and click **Run pipeline** to get recommendations.")
-    st.stop()
+#if not submitted:
+    #st.info("Fill out the form above and click **Run pipeline** to get recommendations.")
+    #st.stop()
 
 user_profile = {
     "age": age,
