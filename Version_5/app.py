@@ -171,7 +171,7 @@ if page == "Pipeline Status":
 # ---------------------------------------------------------------------------
 # Page: Get My Recommendations
 # ---------------------------------------------------------------------------
-st.title("Find jobs that fit your profile")
+st.title("🍁 Find jobs that fit your profile")
 st.caption(
     "Fill out your background once — the app runs it through every model in the pipeline "
     "and returns ranked, explained job recommendations."
@@ -227,7 +227,7 @@ with st.form("profile_form"):
             list(label_encoders["credential_recognition_status"].classes_),
         )
         regulated_profession = st.radio(
-            "Is your profession regulated in Canada?", ["No", "Yes"], horizontal=True
+            "Is your profession regulated in Canada?", ["Yes", "No"], horizontal=True
         )
         speaks_official_language = st.radio(
             "Speak English or French fluently?", ["Yes", "No"], horizontal=True
