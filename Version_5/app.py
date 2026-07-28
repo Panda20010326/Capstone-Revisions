@@ -284,11 +284,61 @@ user_profile = {
 # ---------------------------------------------------------------------------
 # Run the pipeline, stage by stage
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Run the pipeline, stage by stage
+# ---------------------------------------------------------------------------
 if submitted:
     with st.status("Running pipeline...", expanded=True) as status:
         status.update(label="Stage 1/5 — ProfileEncoder")
         profile_result = encode_profile(user_profile)
-        # ... (all your existing stage code, unchanged) ...
+        if profile_result.used_fallback:
+            st.warning(
+                "ProfileEncoder trained artifacts not found — used a keyword-based fallback for "
+                "predicted occupation and profile fit score. See **Pipeline Status** in the sidebar."
+            )
+        st.write(
+            f"Predicted occupation: **{profile_result.predicted_occupation}** "
+            f"(profile fit score: **{profile_result.profile_fit_score:.0%}**)"
+        )
+
+        status.update(label="Stage 2/5 — Employment XGBoost")
+        try:
+            models = load_xgb_models()
+        except FileNotFoundError as exc:
+            status.update(label="Failed to load Employment/Income XGBoost artifacts", state="error")
+            st.error(str(exc))
+            st.stop()
+        ei_result = models.run(user_profile)
+        st.write(f"Employment probability: **{ei_result.employment_probability:.0%}**")
+
+        status.update(label="Stage 3/5 — Income XGBoost")
+        if ei_result.predicted_income is not None:
+            st.write(f"Predicted annual income: **${ei_result.predicted_income:,.0f}**")
+        else:
+            st.write(ei_result.income_skipped_reason)
+
+        status.update(label="Stage 4/5 — Job listings")
+        search_keyword = build_search_keyword(
+            profile_result.predicted_occupation, previous_occupation, keyword_override
+        )
+        if use_local_jobs:
+            jobs_df = cached_get_jobs_local(search_keyword, preferred_city)
+            source_label = "local dataset (offline)"
+        else:
+            jobs_df = cached_get_jobs_live(search_keyword, preferred_city)
+            source_label = "live Adzuna API"
+        st.write(
+            f"Search: `{search_keyword}` in `{preferred_city}` → **{len(jobs_df)}** jobs "
+            f"from the {source_label}."
+        )
+        if use_local_jobs:
+            st.caption(
+                "ℹ️ This dataset was collected from one Adzuna search (mostly Toronto-area, "
+                "IT/data/analyst-leaning roles) and doesn't refresh — results for very different "
+                "occupations or other cities fall back to the closest available matches rather "
+                "than nothing. Switch to **Live Adzuna API** in the sidebar for a real-time, "
+                "location-specific search."
+            )
 
         status.update(label="Stage 5/5 — Recommendation Engine")
         predictions = {
@@ -297,7 +347,6 @@ if submitted:
             "predicted_occupation": profile_result.predicted_occupation,
             "profile_fit_score": profile_result.profile_fit_score,
         }
-
         if jobs_df.empty:
             ranked_jobs = pd.DataFrame()
             status.update(label="No jobs found for this search", state="error")
