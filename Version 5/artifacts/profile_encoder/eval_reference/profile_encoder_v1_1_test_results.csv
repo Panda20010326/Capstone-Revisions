@@ -1,2 +1,0 @@
-model_version,employment_threshold,employment_accuracy,employment_macro_f1,income_mae,income_rmse,income_r2,category_accuracy
-ProfileEncoder 1.1,0.4,0.7094202898550724,0.6194501426597779,14032.025698631725,18843.158725542526,0.6381450529598008,0.6020408163265306
