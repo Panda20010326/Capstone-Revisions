@@ -381,9 +381,9 @@ st.header("Your results")
 # ---------------------------------------------------------------------------
 # Key metric cards
 # ---------------------------------------------------------------------------
-st.subheader("Your profile snapshot")
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Predicted occupation", profile_result.predicted_occupation)
+st.metric("Predicted occupation", profile_result.predicted_occupation)
+
+m2, m3, m4 = st.columns(3)
 m2.metric("Profile fit score", f"{profile_result.profile_fit_score:.0%}")
 m3.metric("Employment probability", f"{ei_result.employment_probability:.0%}")
 if ei_result.predicted_income is not None:
