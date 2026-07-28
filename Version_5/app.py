@@ -419,25 +419,25 @@ else:
     table["Company"] = ranked_jobs[company_col] if company_col else ""
     table["Match score"] = ranked_jobs["match_score"]
 
-   def format_salary_range(row):
-    smin = row.get(salary_min_col) if salary_min_col else None
-    smax = row.get(salary_max_col) if salary_max_col else None
-    smin = None if pd.isna(smin) or smin in (0, "0") else float(smin)
-    smax = None if pd.isna(smax) or smax in (0, "0") else float(smax)
-    if smin is None and smax is None:
-        return "Salary not available"
-    if smin is not None and smax is not None:
-        return f"${smin:,.0f} – ${smax:,.0f}"
-    return f"${(smin or smax):,.0f}"
+    def format_salary_range(row):
+        smin = row.get(salary_min_col) if salary_min_col else None
+        smax = row.get(salary_max_col) if salary_max_col else None
+        smin = None if pd.isna(smin) or smin in (0, "0") else float(smin)
+        smax = None if pd.isna(smax) or smax in (0, "0") else float(smax)
+        if smin is None and smax is None:
+            return "Salary not available"
+        if smin is not None and smax is not None:
+            return f"${smin:,.0f} – ${smax:,.0f}"
+        return f"${(smin or smax):,.0f}"
 
-if salary_col:
-    table["Salary"] = ranked_jobs[salary_col].apply(
-        lambda v: "Salary not available" if pd.isna(v) or v in (0, "0") else f"${float(v):,.0f}"
-    )
-elif salary_min_col and salary_max_col:
-    table["Salary"] = ranked_jobs.apply(format_salary_range, axis=1)
-else:
-    table["Salary"] = "Salary not available"
+    if salary_col:
+        table["Salary"] = ranked_jobs[salary_col].apply(
+            lambda v: "Salary not available" if pd.isna(v) or v in (0, "0") else f"${float(v):,.0f}"
+        )
+    elif salary_min_col and salary_max_col:
+        table["Salary"] = ranked_jobs.apply(format_salary_range, axis=1)
+    else:
+        table["Salary"] = "Salary not available"
 
     table["Link"] = ranked_jobs[link_col] if link_col else None
 
