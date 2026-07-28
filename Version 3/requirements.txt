@@ -1,0 +1,17 @@
+# Pinned to the exact versions this app was built and tested against.
+# Loosen to >= if you need to match another environment's constraints, but
+# test the ProfileEncoder load (tensorflow/keras) and the two XGBoost .pkl
+# loads (xgboost/scikit-learn) again after any version change -- those three
+# are the ones most sensitive to version drift.
+
+streamlit==1.60.0
+pandas==3.0.2
+numpy==2.4.4
+joblib==1.5.3
+scikit-learn==1.8.0
+xgboost==3.3.0
+requests==2.33.1
+folium==0.20.0
+streamlit-folium==0.27.3
+plotly==6.9.0
+tensorflow-cpu==2.21.0
