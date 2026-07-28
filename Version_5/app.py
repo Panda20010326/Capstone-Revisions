@@ -379,6 +379,99 @@ st.divider()
 st.header("Your results")
 
 # ---------------------------------------------------------------------------
+# Key metric cards
+# ---------------------------------------------------------------------------
+st.subheader("Your profile snapshot")
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Predicted occupation", profile_result.predicted_occupation)
+m2.metric("Profile fit score", f"{profile_result.profile_fit_score:.0%}")
+m3.metric("Employment probability", f"{ei_result.employment_probability:.0%}")
+if ei_result.predicted_income is not None:
+    m4.metric("Predicted annual income", f"${ei_result.predicted_income:,.0f}")
+else:
+    m4.metric("Predicted annual income", "N/A")
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# Ranked jobs table
+# ---------------------------------------------------------------------------
+st.subheader("Recommended jobs")
+
+if ranked_jobs.empty:
+    st.info("No job recommendations to display for this search.")
+else:
+    def first_existing(df, candidates):
+        for c in candidates:
+            if c in df.columns:
+                return c
+        return None
+
+    title_col = first_existing(ranked_jobs, ["title", "job_title"])
+    company_col = first_existing(ranked_jobs, ["company", "company_name"])
+    salary_col = first_existing(ranked_jobs, ["salary", "salary_avg", "predicted_salary"])
+    salary_min_col = first_existing(ranked_jobs, ["salary_min"])
+    salary_max_col = first_existing(ranked_jobs, ["salary_max"])
+    link_col = first_existing(ranked_jobs, ["redirect_url", "url", "link", "job_url"])
+
+    table = pd.DataFrame()
+    table["Title"] = ranked_jobs[title_col] if title_col else ""
+    table["Company"] = ranked_jobs[company_col] if company_col else ""
+    table["Match score"] = ranked_jobs["match_score"]
+
+    if salary_col:
+        table["Salary"] = ranked_jobs[salary_col]
+    elif salary_min_col and salary_max_col:
+        table["Salary"] = (
+            ranked_jobs[salary_min_col].fillna(0).astype(float).map("${:,.0f}".format)
+            + " – "
+            + ranked_jobs[salary_max_col].fillna(0).astype(float).map("${:,.0f}".format)
+        )
+    else:
+        table["Salary"] = "N/A"
+
+    table["Link"] = ranked_jobs[link_col] if link_col else None
+
+    table = table.sort_values("Match score", ascending=False)
+
+    st.dataframe(
+        table,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Match score": st.column_config.ProgressColumn(
+                "Match score", min_value=0, max_value=100, format="%.0f%%"
+            ),
+            "Link": st.column_config.LinkColumn("Job posting", display_text="View job ↗"),
+        },
+    )
+
+    # ---------------------------------------------------------------------------
+    # Match score chart
+    # ---------------------------------------------------------------------------
+    st.subheader("Match score comparison")
+    chart_df = table.sort_values("Match score", ascending=True)
+    fig = px.bar(
+        chart_df,
+        x="Match score",
+        y="Title",
+        orientation="h",
+        color="Match score",
+        color_continuous_scale="RdYlGn",
+        range_color=[0, 100],
+        labels={"Match score": "Match score (%)", "Title": ""},
+    )
+    fig.update_layout(showlegend=False, height=max(300, 40 * len(chart_df)))
+    st.plotly_chart(fig, use_container_width=True)
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# Folium interactive map
+# ---------------------------------------------------------------------------
+st.subheader("Job locations")
+
+# ---------------------------------------------------------------------------
 # Folium interactive map
 # ---------------------------------------------------------------------------
 st.subheader("Job locations")
