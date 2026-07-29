@@ -563,17 +563,15 @@ else:
             housing_df["city"].str.lower() == preferred_city.strip().lower()
         ]
         for _, row in city_housing.dropna(subset=["latitude", "longitude"]).iterrows():
-            folium.CircleMarker(
+            folium.Marker(
                 location=[float(row["latitude"]), float(row["longitude"])],
-                radius=5,
-                color="blue",
-                fill=True,
-                fill_opacity=0.4,
-                popup=(
-                    f"{row.get('neighbourhood', '')}<br>"
-                    f"Avg. monthly rent: ${row.get('monthly_rent', 'N/A')}"
+                popup=folium.Popup(
+                    f"<b>{row.get('neighbourhood', 'Housing data point')}</b><br>"
+                    f"Avg. monthly rent: ${row.get('monthly_rent', 'N/A')}",
+                    max_width=250,
                 ),
                 tooltip="Housing data point",
+                icon=folium.Icon(color="blue", icon="home", prefix="fa"),
             ).add_to(job_map)
 
     st_folium(job_map, use_container_width=True, height=500)
