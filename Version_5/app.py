@@ -475,6 +475,61 @@ else:
 
 st.divider()
 
+ ---------------------------------------------------------------------------
+# Housing affordability
+# ---------------------------------------------------------------------------
+st.subheader("Housing affordability")
+ 
+if housing_df is None:
+    st.info("Housing dataset not found — affordability can't be estimated for this run.")
+else:
+    city_housing_afford = housing_df[
+        housing_df["city"].str.lower() == preferred_city.strip().lower()
+    ]
+    if city_housing_afford.empty:
+        st.info(f"No housing data on file for **{preferred_city}** — affordability can't be estimated.")
+    elif ei_result.predicted_income is None:
+        st.info(
+            "Predicted income wasn't available for this profile "
+            f"({ei_result.income_skipped_reason}), so affordability can't be calculated."
+        )
+    else:
+        avg_rent = city_housing_afford["monthly_rent"].dropna().astype(float).mean()
+        monthly_income = ei_result.predicted_income / 12
+        rent_to_income = (avg_rent / monthly_income) if monthly_income else None
+ 
+        a1, a2, a3 = st.columns(3)
+        a1.metric(f"Avg. monthly rent — {preferred_city.title()}", f"${avg_rent:,.0f}")
+        a2.metric("Predicted monthly income", f"${monthly_income:,.0f}")
+        if rent_to_income is not None:
+            a3.metric("Rent-to-income ratio", f"{rent_to_income:.0%}")
+ 
+        if rent_to_income is not None:
+            if rent_to_income <= 0.30:
+                st.success(
+                    f"🟢 **Affordable** — rent is about {rent_to_income:.0%} of predicted monthly "
+                    "income (the common affordability benchmark is 30% or less)."
+                )
+            elif rent_to_income <= 0.50:
+                st.warning(
+                    f"🟠 **Stretched** — rent is about {rent_to_income:.0%} of predicted monthly "
+                    "income, above the 30% affordability benchmark."
+                )
+            else:
+                st.error(
+                    f"🔴 **Unaffordable at this income level** — rent is about {rent_to_income:.0%} "
+                    "of predicted monthly income, well above the 30% affordability benchmark."
+                )
+ 
+        st.caption(
+            f"Based on {len(city_housing_afford)} housing data point(s) for {preferred_city.title()} "
+            "in `housing_geocoded.csv`. The 30% / 50% thresholds follow the standard "
+            "shelter-cost-to-income affordability rule of thumb, and this is an estimate, not "
+            "financial advice."
+        )
+ 
+st.divider()
+
 # ---------------------------------------------------------------------------
 # Folium interactive map
 # ---------------------------------------------------------------------------
