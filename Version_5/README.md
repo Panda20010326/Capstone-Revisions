@@ -83,7 +83,7 @@ roles in the Toronto area (that's what it was originally searched for) and
 it's frozen at whatever Adzuna returned when it was collected — it won't
 reflect newly posted or removed jobs. It's genuinely useful for demos, offline
 testing, and avoiding API rate limits, but it's not a substitute for the live
-API in production once you have your own Adzuna key. If you want broader
+API in production once you have your own Adzuna key. If we want broader
 offline coverage, run `adzuna_job_analysis.py` (or a few more searches with
 different keywords/cities) and append the results to
 `data/processed_adzuna_jobs.csv` — the schema just needs to match the
@@ -104,40 +104,6 @@ The five files `06_ProfileEncoder_revised.ipynb` produces are now in
 now returns `used_fallback=False` and a real 16-dimensional embedding.
 `tensorflow-cpu` is a required dependency now (see `requirements.txt`).
 
-**Test-set metrics from this training run** (also saved in
-`artifacts/profile_encoder/eval_reference/profile_encoder_v1_1_test_results.csv`):
-
-| Metric | Value |
-|---|---|
-| Employment accuracy | 70.9% |
-| Employment macro F1 | 0.620 |
-| Income MAE | $14,032 |
-| Income RMSE | $18,843 |
-| Income R² | 0.638 |
-| Occupation-category accuracy | 60.2% |
-
-A few things worth knowing about these numbers before treating them as final:
-- **Occupation category is imbalanced and noisy at the tail.** Precision/recall
-  per class range from very strong (Natural & Applied Sciences: 0.97 recall,
-  Health: 0.98 recall) to weak (Manufacturing & Utilities: 0.36 recall,
-  Sales & Service: 0.44 recall) -- those two categories are the ones most often
-  confused with each other and with Trades. If category quality matters more
-  than it currently performs, more training data or feature engineering for
-  those specific categories would help most.
-- **Employment recall on "Not Employed" is low (51%)** even with `class_weight="balanced"` --
-  the model still leans toward predicting "Employed." The 0.40 threshold
-  (chosen in the notebook via validation-set macro-F1) is already tuned for
-  this; a different threshold trades precision/recall differently if the
-  app's use case cares more about one class.
-- These are Version 1.1 numbers on one train/val/test split with `SEED = 42`,
-  exactly as the notebook defines it -- retraining will shift them slightly.
-- `eval_reference/profile_encoder_recommendation_inputs_v1_1.csv` has the
-  embedding + all three predictions for every one of the 6,900 profiles in
-  the dataset, useful for offline evaluation, nearest-neighbour sanity checks,
-  or batch recommendations without going through the live Streamlit form.
-
-If you retrain later (more data, tuned architecture, etc.), just overwrite
-these six files with the new ones -- no code changes needed.
 
 ## Bug found and fixed during integration
 
@@ -152,9 +118,9 @@ feature-name validation rejects the row otherwise.
 
 Fix applied in `pipeline/xgb_models.py` (`_XGB_COLUMN_RENAME`): the column is
 renamed right before calling `.predict()` / `.predict_proba()`. If those two
-models ever get retrained, check `classifier.get_booster().feature_names`
+models ever get retrained, we check `classifier.get_booster().feature_names`
 again — if the retrained version uses `occupation_category` consistently,
-delete the rename step.
+delete then rename step.
 
 ## Security note — Adzuna API key
 
@@ -167,77 +133,23 @@ code. `adzuna_client.py` checks Streamlit secrets first, then environment
 variables, and only falls back to the old hardcoded pair as a last resort so
 the app still runs before you've set anything up.
 
-## Deploying to Streamlit Community Cloud
-
-Yes — this is a single-file Streamlit app with no required external services
-(Adzuna is optional — see below), so it deploys cleanly to
-[share.streamlit.io](https://share.streamlit.io) for free. Steps:
-
-1. **Push this folder to a GitHub repo** (public or private — Streamlit Cloud
-   can access private repos once you connect your GitHub account).
-   ```bash
-   cd integrated_app
-   git init
-   git add .
-   git commit -m "Integrated newcomer career navigator pipeline"
-   git remote add origin <your-repo-url>
-   git push -u origin main
-   ```
-   `.gitignore` already excludes `.streamlit/secrets.toml` — never commit your
-   real Adzuna keys.
-
-2. **Go to share.streamlit.io → New app**, pick the repo/branch, and set the
-   main file path to `app.py`.
-
-3. **Deploy.** First build takes a few minutes (mostly installing
-   `tensorflow-cpu`); redeploys after that are fast since the environment is
-   cached. **That's it** — the app defaults to the offline job dataset
-   (`data/processed_adzuna_jobs.csv`), so it works fully out of the box with
-   no Adzuna key at all.
-
-4. **(Optional) Add your own Adzuna keys** under the app's Settings → Secrets
-   only if you want the "Live Adzuna API" option in the sidebar toggle to
-   actually hit the real API instead of falling back to the old exposed demo
-   key baked into `adzuna_client.py`. Same TOML format as
-   `.streamlit/secrets.toml.example`:
-   ```toml
-   ADZUNA_APP_ID = "your_real_app_id"
-   ADZUNA_APP_KEY = "your_real_app_key"
-   ```
-   Skip this step entirely if you're fine with the default "Local dataset"
-   mode — nothing in the app requires it.
 
 ### Things worth checking on the free tier
 
 - **Memory (1 GB on the free tier):** the actual model files are tiny
   (~1.2 MB combined), but `tensorflow-cpu` itself uses a few hundred MB of RAM
-  once imported. This app comfortably fits, but if you later add more heavy
-  dependencies (e.g. `shap`), keep an eye on memory during testing.
-- **Cold starts:** free-tier apps sleep after inactivity; the first request
-  after waking will be slower while TensorFlow re-initializes. `st.cache_resource`
-  is already used for all model loads so this only happens once per wake, not
-  per request.
+  once imported. This app comfortably fits.
+
 - **`requirements.txt` is pinned** to the exact versions this app was built
   and tested against, and `runtime.txt` pins Python to 3.12 — this avoids
   Streamlit Cloud resolving a newer TensorFlow/Keras or scikit-learn version
-  that can't load these specific `.keras`/`.pkl` files. If you need to loosen
-  a version, re-test the ProfileEncoder and XGBoost loads specifically (see
-  the comment at the top of `requirements.txt`).
-- **Other hosts work too** if you'd rather not use Streamlit Community Cloud —
-  Hugging Face Spaces (Streamlit SDK), Render, Railway, or your own Docker
-  container all run this app as-is; only the secrets-configuration step
-  changes (environment variables instead of `st.secrets` on most of those,
-  which `adzuna_client.py` already falls back to automatically).
+  that can't load these specific `.keras`/`.pkl` files.
 
 ## Notes
 
-- A `LabelEncoder version mismatch` warning may print on load (the pickles
-  were saved with a slightly older scikit-learn). It's a warning, not an
-  error — everything still runs correctly — but re-pickling the encoders
-  with your current scikit-learn version will make it go away.
 - The old `Streamlit_Integration/App_Versions/app_v.1.py` is a simpler,
   standalone employment-only demo (7 features, SHAP waterfall chart, no
   ProfileEncoder/Adzuna/recommendation engine). It's not part of this
   integrated app, but its SHAP-explanation approach could be added as an
-  extra expander in Stage 2's results if you want per-prediction SHAP
+  extra expander in Stage 2's results if needed per-prediction SHAP
   charts alongside the recommendation engine's plain-language explanations.
