@@ -1,2 +1,2 @@
 # Capstone-Revisions
-Just for attempts
+Repository with organized files and Streamlit Versions
