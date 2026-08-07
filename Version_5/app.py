@@ -260,7 +260,7 @@ with st.form("profile_form"):
             1,
             8,
             2,
-            help="The total number of people in your household, including yourself.",
+            help="The total number of people in your household that will come to Canada, including yourself.",
         )
  
     with col2:
