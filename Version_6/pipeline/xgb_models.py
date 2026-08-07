@@ -1,4 +1,4 @@
-```python
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -165,6 +165,5 @@ class XGBModels:
 @__import__("functools").lru_cache(maxsize=1)
 def get_models() -> XGBModels:
     return XGBModels()
-```
 
 
