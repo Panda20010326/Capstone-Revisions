@@ -252,15 +252,34 @@ with st.form("profile_form"):
             "Region of origin",
             _with_extra_options(
                 list(label_encoders["world_region"].classes_),
-                ["North America", "South America"],
+                [
+                    "North America",
+                    "Central America",
+                    "South America",
+                    "Caribbean",
+                    "Western Europe",
+                    "Eastern Europe",
+                    "Northern Europe",
+                    "Southern Europe",
+                    "North Africa",
+                    "Sub-Saharan Africa",
+                    "Middle East",
+                    "Central Asia",
+                    "South Asia",
+                    "Southeast Asia",
+                    "East Asia",
+                    "Oceania",
+                ],
             ),
+            help="Pick the region that best matches where you're from. If your country "
+            "isn't covered by your usual region, choose the closest match.",
         )
         family_size = st.slider(
             "Family size",
             1,
             8,
             2,
-            help="The total number of people in your household that will come to Canada, including yourself.",
+            help="The total number of people in your household, including yourself.",
         )
  
     with col2:
