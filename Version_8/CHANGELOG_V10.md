@@ -1,4 +1,4 @@
-# Version 10 changes
+# Version 8.1 changes
 
 ## Employment probability
 - Replaced the previous class-weighted raw XGBoost probability with a tuned, unweighted XGBoost classifier.
