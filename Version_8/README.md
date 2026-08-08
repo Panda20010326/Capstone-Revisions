@@ -1,4 +1,4 @@
-# Career Navigator — Version 10
+# Career Navigator — Version 8
 
 Career Navigator is a Streamlit capstone application for newcomer career planning in Ontario.
 
@@ -14,7 +14,7 @@ Career Navigator is a Streamlit capstone application for newcomer career plannin
 
 Training notebooks remain in `notebooks/` for documentation and reproducibility. The Karthika recommendation notebook has a runtime Python conversion at `pipeline/karthika_recommendation.py`.
 
-## Version 10 model improvement
+## Version 8 model improvement
 
 The employment classifier now uses a tuned XGBoost model with **sigmoid probability calibration**. The supplied dataset has an employment base rate of approximately 78.1%, so calibrated probabilities are designed to reflect that base rate instead of acting like overconfident raw scores.
 
