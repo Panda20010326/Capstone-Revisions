@@ -1,0 +1,51 @@
+{
+  "features": [
+    "age",
+    "sex",
+    "admission_category",
+    "world_region",
+    "speaks_official_language",
+    "education_level",
+    "family_size",
+    "field_of_study",
+    "previous_occupation",
+    "occupation_category",
+    "years_of_experience",
+    "teer_category",
+    "credential_recognition_status",
+    "regulated_profession"
+  ],
+  "classifier_metrics": {
+    "accuracy": 0.7768115942028986,
+    "f1": 0.8732510288065843,
+    "precision": 0.7847633136094675,
+    "recall": 0.9842300556586271,
+    "roc_auc": 0.7100283822138127,
+    "brier_score": 0.1552100339685901,
+    "mean_predicted_probability": 0.7783901276061639,
+    "observed_employment_rate_test": 0.7811594202898551
+  },
+  "income_metrics": {
+    "mae": 14316.626573552006,
+    "rmse": 19386.589364512478,
+    "r2": 0.6082878250555201
+  },
+  "probability_calibration": {
+    "method": "sigmoid",
+    "cross_validation_folds": 5,
+    "base_model": {
+      "max_depth": 2,
+      "n_estimators": 400,
+      "learning_rate": 0.04,
+      "min_child_weight": 3,
+      "subsample": 0.9,
+      "colsample_bytree": 0.9,
+      "reg_lambda": 2.0
+    },
+    "scale_pos_weight": null,
+    "reason": "Probability should reflect the observed employment base rate instead of a class-weighted score."
+  },
+  "threshold": 0.5,
+  "training_employment_rate": 0.7811594202898551,
+  "note": "Uses occupation_category instead of employment_category to avoid outcome leakage and match app inputs."
+}
