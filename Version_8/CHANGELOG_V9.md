@@ -1,4 +1,4 @@
-# Version 9 fixes
+# Version 8.0 fixes
 
 ## 1. No more Toronto fallback for another city
 The local job source previously searched by keyword across the whole file when the requested city had no local postings. Since the bundled job file is mostly Toronto, this silently returned Toronto jobs for other cities.
