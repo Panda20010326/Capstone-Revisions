@@ -705,11 +705,6 @@ st.divider()
 # ---------------------------------------------------------------------------
 st.subheader("Job locations and nearby housing")
 
-# The previous map plotted the entire housing dataset for the selected city.
-# That caused many synthetic/offshore CMHC coordinates to appear in Lake Ontario
-# and did not show the jobs that the recommendation engine actually selected.
-# This map uses only Karthika-ranked jobs and housing matched to those jobs.
-
 map_jobs = ranked_jobs.copy()
 map_homes = housing_recommendations.copy()
 
@@ -806,7 +801,7 @@ else:
     )
 
     st.info(
-        "The map uses the converted Karthika Recommendation Engine. It shows the "
+        "The map shows the "
         "top recommended jobs and only nearby housing within the 30 km commute limit; "
         "it no longer plots every housing record in the dataset."
     )
