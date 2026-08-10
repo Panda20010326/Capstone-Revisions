@@ -501,7 +501,220 @@ def artifact_status() -> list[dict]:
         for name, path in checks
     ]
 
+# ---------------------------------------------------------------------------
+# Geographic validation helpers
+# ---------------------------------------------------------------------------
 
+# Conservative land-safe bounds for the cities used by the app.
+#
+# These are intentionally conservative. The goal is to prevent synthetic
+# housing coordinates from appearing in lakes/rivers rather than trying to
+# represent the exact municipal boundary.
+#
+# latitude_min / latitude_max / longitude_min / longitude_max
+
+CITY_LAND_BOUNDS = {
+    "toronto": {
+        "lat_min": 43.58,
+        "lat_max": 43.86,
+        "lon_min": -79.65,
+        "lon_max": -79.15,
+    },
+    "mississauga": {
+        "lat_min": 43.50,
+        "lat_max": 43.75,
+        "lon_min": -79.80,
+        "lon_max": -79.45,
+    },
+    "brampton": {
+        "lat_min": 43.62,
+        "lat_max": 43.85,
+        "lon_min": -79.90,
+        "lon_max": -79.55,
+    },
+    "hamilton": {
+        "lat_min": 43.20,
+        "lat_max": 43.45,
+        "lon_min": -80.15,
+        "lon_max": -79.65,
+    },
+    "ottawa": {
+        "lat_min": 45.20,
+        "lat_max": 45.60,
+        "lon_min": -76.00,
+        "lon_max": -75.30,
+    },
+    "kitchener": {
+        "lat_min": 43.35,
+        "lat_max": 43.60,
+        "lon_min": -80.70,
+        "lon_max": -80.30,
+    },
+    "waterloo": {
+        "lat_min": 43.40,
+        "lat_max": 43.60,
+        "lon_min": -80.70,
+        "lon_max": -80.40,
+    },
+    "london": {
+        "lat_min": 42.85,
+        "lat_max": 43.20,
+        "lon_min": -81.45,
+        "lon_max": -81.05,
+    },
+    "windsor": {
+        "lat_min": 42.20,
+        "lat_max": 42.40,
+        "lon_min": -83.20,
+        "lon_max": -82.80,
+    },
+    "markham": {
+        "lat_min": 43.75,
+        "lat_max": 44.05,
+        "lon_min": -79.55,
+        "lon_max": -79.15,
+    },
+    "kingston": {
+        "lat_min": 44.15,
+        "lat_max": 44.35,
+        "lon_min": -76.65,
+        "lon_max": -76.30,
+    },
+    "burlington": {
+        "lat_min": 43.25,
+        "lat_max": 43.50,
+        "lon_min": -79.95,
+        "lon_max": -79.60,
+    },
+    "oakville": {
+        "lat_min": 43.40,
+        "lat_max": 43.60,
+        "lon_min": -80.00,
+        "lon_max": -79.55,
+    },
+    "vaughan": {
+        "lat_min": 43.75,
+        "lat_max": 44.05,
+        "lon_min": -79.75,
+        "lon_max": -79.35,
+    },
+    "cambridge": {
+        "lat_min": 43.25,
+        "lat_max": 43.55,
+        "lon_min": -80.55,
+        "lon_max": -80.15,
+    },
+    "sudbury": {
+        "lat_min": 46.35,
+        "lat_max": 46.70,
+        "lon_min": -81.25,
+        "lon_max": -80.70,
+    },
+}
+
+
+def _canonical_city(city: str) -> str:
+    """Convert common city names/variants to a canonical city key."""
+
+    city = str(city or "").strip().lower()
+
+    aliases = {
+        "greater toronto": "toronto",
+        "toronto, ontario": "toronto",
+        "mississauga, ontario": "mississauga",
+        "brampton, ontario": "brampton",
+        "hamilton, ontario": "hamilton",
+        "ottawa, ontario": "ottawa",
+        "kitchener, ontario": "kitchener",
+        "waterloo, ontario": "waterloo",
+        "london, ontario": "london",
+        "windsor, ontario": "windsor",
+        "markham, ontario": "markham",
+    }
+
+    return aliases.get(city, city)
+
+
+def filter_land_safe_housing(
+    housing_df: pd.DataFrame,
+    preferred_city: str,
+) -> pd.DataFrame:
+    """
+    Remove invalid housing coordinates before they reach Folium.
+
+    This is deliberately stricter than a generic Ontario bounding box.
+    It prevents coordinates inside Lake Ontario and other nearby water
+    bodies from being displayed as housing.
+    """
+
+    if housing_df is None or housing_df.empty:
+        return pd.DataFrame()
+
+    df = housing_df.copy()
+
+    # Support either coordinate naming convention.
+    if "lat" in df.columns:
+        lat_col = "lat"
+    elif "latitude" in df.columns:
+        lat_col = "latitude"
+    else:
+        return pd.DataFrame()
+
+    if "lon" in df.columns:
+        lon_col = "lon"
+    elif "longitude" in df.columns:
+        lon_col = "longitude"
+    else:
+        return pd.DataFrame()
+
+    df[lat_col] = pd.to_numeric(
+        df[lat_col],
+        errors="coerce",
+    )
+
+    df[lon_col] = pd.to_numeric(
+        df[lon_col],
+        errors="coerce",
+    )
+
+    df = df.dropna(
+        subset=[
+            lat_col,
+            lon_col,
+        ]
+    )
+
+    # Basic Canada/Ontario sanity check first.
+    df = df[
+        df[lat_col].between(40, 60)
+        &
+        df[lon_col].between(-95, -70)
+    ].copy()
+
+    city_key = _canonical_city(preferred_city)
+
+    bounds = CITY_LAND_BOUNDS.get(city_key)
+
+    if bounds is None:
+        # If a city isn't explicitly listed, we keep the broad Ontario check.
+        # This avoids accidentally deleting valid data for an unsupported
+        # city.
+        return df
+
+    df = df[
+        df[lat_col].between(
+            bounds["lat_min"],
+            bounds["lat_max"],
+        )
+        &
+        df[lon_col].between(
+            bounds["lon_min"],
+            bounds["lon_max"],
+        )
+    ].copy()
+
+    return df
+    
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
@@ -1792,42 +2005,38 @@ if not map_jobs.empty:
 
 if not map_homes.empty:
 
-    # Re-apply the housing validation.
+    # First apply the recommendation engine's filtering.
     map_homes = prepare_housing_data(
         map_homes,
         preferred_city,
     )
 
-    map_homes["lat"] = pd.to_numeric(
-        map_homes["lat"],
-        errors="coerce",
+    # Then apply our stricter geographic land-safety filter.
+    # This is the important second layer that prevents housing
+    # coordinates from appearing in Lake Ontario or other water.
+    map_homes = filter_land_safe_housing(
+        map_homes,
+        preferred_city,
     )
 
-    map_homes["lon"] = pd.to_numeric(
-        map_homes["lon"],
-        errors="coerce",
-    )
+    if not map_homes.empty:
 
-    map_homes = map_homes.dropna(
-        subset=[
-            "lat",
-            "lon",
-        ]
-    )
-
-
-    # Same geographic sanity check for housing.
-    map_homes = map_homes[
-        map_homes["lat"].between(
-            40,
-            60,
+        map_homes["lat"] = pd.to_numeric(
+            map_homes["lat"],
+            errors="coerce",
         )
-        &
-        map_homes["lon"].between(
-            -95,
-            -70,
+
+        map_homes["lon"] = pd.to_numeric(
+            map_homes["lon"],
+            errors="coerce",
         )
-    ]
+
+        map_homes = map_homes.dropna(
+            subset=[
+                "lat",
+                "lon",
+            ]
+        )
 
 
 # ---------------------------------------------------------------------------
