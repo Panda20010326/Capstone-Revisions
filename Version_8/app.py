@@ -1,4 +1,4 @@
-```python
+
 """
 app.py
 ------
@@ -2190,6 +2190,6 @@ else:
         "It shows the top recommended jobs and only nearby housing "
         "within the 30 km commute limit."
     )
-```
+
 
 
