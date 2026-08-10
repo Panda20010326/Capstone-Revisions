@@ -15,12 +15,12 @@ Single Streamlit interface that runs the full Capstone Group 4 pipeline:
 Run with:
     streamlit run app.py
 """
+
 from __future__ import annotations
 
-# For Adzuna key
+#For Adzuna API key
 #from dotenv import load_dotenv
 #load_dotenv()
-
 
 import os
 from pathlib import Path
@@ -41,6 +41,7 @@ from pipeline.karthika_recommendation import (
     rank_jobs as karthika_rank_jobs,
     build_housing_recommendations as karthika_build_housing_recommendations,
     prepare_housing_data,
+    load_housing_data as karthika_load_housing_data,
 )
 
 
@@ -235,10 +236,7 @@ def load_xgb_models():
 
 @st.cache_data(show_spinner=False)
 def load_housing_data():
-    if os.path.exists(config.HOUSING_DATA_PATH):
-        return pd.read_csv(config.HOUSING_DATA_PATH)
-
-    return None
+    return karthika_load_housing_data()
 
 
 @st.cache_data(show_spinner=False)
