@@ -276,7 +276,11 @@ def recommend_housing(
     combined_weights: dict[str, float] | None = None,
     distance_provider: Any | None = None,
 ) -> pd.DataFrame:
-    """Return the best housing options for each already-ranked job.  
+    """Return the best housing options for each already-ranked job.
+
+    distance_provider defaults to StraightLineDistanceProvider, so this runs fully offline out of the box. Pass an OSRMDistanceProvider (from
+    commute_distance.py) to score real driving distance and duration instead
+    -- useful once you're ready to plug this into settlement_map.py.
     """
     if top_n_per_job <= 0:
         raise ValueError("top_n_per_job must be greater than zero.")
@@ -284,12 +288,22 @@ def recommend_housing(
     job_records = (
         ranked_jobs.to_dict("records") if isinstance(ranked_jobs, pd.DataFrame) else list(ranked_jobs)
     )
+
+    # Drop jobs missing usable coordinates (e.g. Adzuna postings without
+    # precise geocoding) before they reach distance calculation/scoring.
+    job_records = [
+        job for job in job_records
+        if pd.notna(job.get("lat", job.get("latitude")))
+        and pd.notna(job.get("lon", job.get("longitude")))
+    ]
+
     housing_records = (
         housing.to_dict("records") if isinstance(housing, pd.DataFrame) else list(housing)
     )
 
-    # Drop housing candidates whose coordinates land in water (lakes,harbours, rivers) rather than the city they claim to be in, 
-    # before they ever reach scoring or the map.
+    # Drop housing candidates whose coordinates land in water (lakes,
+    # harbours, rivers) rather than the city they claim to be in, before
+    # they ever reach scoring or the map.
     housing_records = filter_land_safe_records(housing_records)
 
     if top_jobs is not None:
