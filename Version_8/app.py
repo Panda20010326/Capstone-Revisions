@@ -15,12 +15,12 @@ Single Streamlit interface that runs the full Capstone Group 4 pipeline:
 Run with:
     streamlit run app.py
 """
-
 from __future__ import annotations
 
-#For Adzuna API key
+# For Adzuna key
 #from dotenv import load_dotenv
 #load_dotenv()
+
 
 import os
 from pathlib import Path
@@ -39,10 +39,8 @@ from pipeline.adzuna_client import get_jobs_multi_page, build_search_keyword
 from pipeline.job_source import dataset_info
 from pipeline.karthika_recommendation import (
     rank_jobs as karthika_rank_jobs,
-    build_housing_recommendations as karthika_build_housing_recommendations,
-    prepare_housing_data,
-    load_housing_data as karthika_load_housing_data,
 )
+from pipeline.housing_recommendation_engine import recommend_housing
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +234,10 @@ def load_xgb_models():
 
 @st.cache_data(show_spinner=False)
 def load_housing_data():
-    return karthika_load_housing_data()
+    if os.path.exists(config.HOUSING_DATA_PATH):
+        return pd.read_csv(config.HOUSING_DATA_PATH)
+
+    return None
 
 
 @st.cache_data(show_spinner=False)
@@ -1464,12 +1465,20 @@ if submitted:
 
 
                 housing_recommendations = (
-                    karthika_build_housing_recommendations(
-                        housing_df
-                        if housing_df is not None
-                        else pd.DataFrame(),
-                        ranked_jobs,
-                        karthika_profile,
+                    recommend_housing(
+                        profile=karthika_profile,
+                        ranked_jobs=ranked_jobs,
+                        housing=(
+                            housing_df
+                            if housing_df is not None
+                            else pd.DataFrame()
+                        ),
+                        top_n_per_job=karthika_profile.get(
+                            "homes_per_job", 5
+                        ),
+                        top_jobs=karthika_profile.get(
+                            "top_jobs", 10
+                        ),
                     )
                 )
 
@@ -2007,15 +2016,10 @@ if not map_jobs.empty:
 
 if not map_homes.empty:
 
-    # First apply the recommendation engine's filtering.
-    map_homes = prepare_housing_data(
-        map_homes,
-        preferred_city,
-    )
-
-    # Then apply our stricter geographic land-safety filter.
-    # This is the important second layer that prevents housing
-    # coordinates from appearing in Lake Ontario or other water.
+    # Land-safety filtering already happened inside recommend_housing()
+    # (via land_bounds.filter_land_safe_records), so map_homes should
+    # already be clean here. filter_land_safe_housing() below is kept
+    # as a harmless secondary check.
     map_homes = filter_land_safe_housing(
         map_homes,
         preferred_city,
