@@ -156,6 +156,12 @@ CITY_LAND_BOUNDS = {
     "windsor": (42.15, 42.48, -83.30, -82.80),
     "thunder bay": (48.15, 48.60, -89.55, -88.95),
     "st. catharines": (43.00, 43.30, -79.45, -79.00),
+    "brantford": (43.00, 43.28, -80.45, -80.05),
+    "greater sudbury": (46.30, 46.70, -81.30, -80.70),
+    "guelph": (43.38, 43.70, -80.45, -80.05),
+    "kitchener waterloo": (43.28, 43.62, -80.72, -80.28),
+    "london": (42.80, 43.18, -81.50, -81.00),
+    "peterborough": (44.12, 44.48, -78.55, -78.05),
 }
 
 
@@ -169,6 +175,26 @@ def normalize_city(value: Any) -> str:
         "ottawa ontario": "ottawa",
         "burlington ontario": "burlington",
         "oakville ontario": "oakville",
+        "brantford ontario": "brantford",
+        "greater sudbury ontario": "greater sudbury",
+        "sudbury": "greater sudbury",
+        "sudbury ontario": "greater sudbury",
+        "guelph ontario": "guelph",
+        "kitchener-waterloo": "kitchener waterloo",
+        "kitchener waterloo ontario": "kitchener waterloo",
+        "kitchener": "kitchener waterloo",
+        "waterloo": "kitchener waterloo",
+        "london ontario": "london",
+        "peterborough ontario": "peterborough",
+        "st catharines": "st. catharines",
+        "st catharines ontario": "st. catharines",
+        "st. catharines ontario": "st. catharines",
+        "thunder bay ontario": "thunder bay",
+        "windsor ontario": "windsor",
+        "oshawa ontario": "oshawa",
+        "barrie ontario": "barrie",
+        "kingston ontario": "kingston",
+        "belleville ontario": "belleville",
     }
     return aliases.get(text, text)
 
@@ -215,8 +241,15 @@ def _looks_like_land(city: Any, lat: float, lon: float) -> bool:
 def prepare_housing_data(
     housing_df: pd.DataFrame,
     target_city: str | None = None,
+    strict_target_city: bool = False,
 ) -> pd.DataFrame:
-    """Normalize coordinates, enforce city selection, and remove offshore points."""
+    """Normalize coordinates and remove invalid/offshore points.
+
+    By default, housing from all available Ontario centres is retained so the
+    recommender can compare a selected job with more affordable nearby cities.
+    Set ``strict_target_city=True`` when the application should show housing
+    only in the selected city.
+    """
     if housing_df.empty:
         return housing_df.copy()
 
@@ -244,9 +277,10 @@ def prepare_housing_data(
         )
     ]
 
-    # If the user selected a city, prefer housing in that city. This prevents
-    # Toronto housing from appearing when the user selected Ottawa, Hamilton, etc.
-    if target_city and "city" in housing.columns:
+    # City-only mode is still available, but Ontario-wide comparison is the
+    # default. The commute filter later decides which other centres are
+    # realistically close enough to the selected job.
+    if strict_target_city and target_city and "city" in housing.columns:
         target = normalize_city(target_city)
         city_mask = housing["city"].map(normalize_city).eq(target)
         city_housing = housing[city_mask].copy()
@@ -259,14 +293,15 @@ def prepare_housing_data(
 def filter_housing_near_jobs(
     housing_df: pd.DataFrame,
     ranked_jobs: pd.DataFrame,
-    max_commute_km: float = 30.0,
+    max_commute_km: float = 75.0,
     target_city: str | None = None,
 ) -> pd.DataFrame:
     """Keep only housing points that are realistically close to one of the ranked jobs."""
     if housing_df.empty or ranked_jobs.empty:
         return housing_df.iloc[0:0].copy()
 
-    homes = prepare_housing_data(housing_df, target_city)
+    # default to Ontario-wide comparison; do not enforce strict city-only filtering here
+    homes = prepare_housing_data(housing_df, target_city, False)
     if homes.empty:
         return homes
 
@@ -302,7 +337,13 @@ def rank_housing_for_job(housing_df: pd.DataFrame, job: pd.Series, profile: dict
     if housing_df.empty:
         return housing_df.copy()
 
-    housing = prepare_housing_data(housing_df, profile.get("preferred_city"))
+    city_scope = clean_text(profile.get("housing_city_scope", "ontario"))
+    strict_city = city_scope in {"preferred city", "selected city", "city only", "preferred_city", "selected_city", "city_only"}
+    housing = prepare_housing_data(
+        housing_df,
+        profile.get("preferred_city"),
+        strict_target_city=strict_city,
+    )
     job_lat = pd.to_numeric(job.get("latitude", job.get("lat")), errors="coerce")
     job_lon = pd.to_numeric(job.get("longitude", job.get("lon")), errors="coerce")
     if pd.isna(job_lat) or pd.isna(job_lon):
@@ -312,7 +353,8 @@ def rank_housing_for_job(housing_df: pd.DataFrame, job: pd.Series, profile: dict
     if salary is None:
         salary = float(profile.get("predicted_income", profile.get("minimum_salary", 65000)) or 65000)
     affordable_rent = max_affordable_rent(salary, profile)
-    max_commute = float(profile.get("max_commute_km", 30))
+    default_commute_km = 30.0 if strict_city else 75.0
+    max_commute = float(profile.get("max_commute_km", default_commute_km))
     preferred_cities = profile.get("preferred_cities", [])
     bedroom_type = clean_text(profile.get("bedroom_type", "2 Bedroom"))
 
@@ -325,6 +367,9 @@ def rank_housing_for_job(housing_df: pd.DataFrame, job: pd.Series, profile: dict
         rent = pd.to_numeric(home.get("monthly_rent"), errors="coerce")
         if pd.isna(rent) or rent <= 0:
             continue
+
+        monthly_income = float(salary) / 12.0 if float(salary) > 0 else 0.0
+        rent_to_income_ratio = float(rent) / monthly_income if monthly_income > 0 else float("inf")
 
         if rent <= affordable_rent:
             affordability = 1.0 - (float(rent) / affordable_rent)
@@ -355,7 +400,13 @@ def rank_housing_for_job(housing_df: pd.DataFrame, job: pd.Series, profile: dict
             "job_salary": float(salary),
             "job_score": job_score,
             "max_affordable_rent": float(affordable_rent),
-            "commute_km": float(distance),
+            "monthly_income": round(monthly_income, 2),
+            "rent_to_income_ratio": round(rent_to_income_ratio, 4),
+            "rent_to_income_pct": round(rent_to_income_ratio * 100.0, 1),
+            "monthly_rent_gap": round(float(affordable_rent) - float(rent), 2),
+            "affordability_status": "Affordable" if float(rent) <= affordable_rent else "Over 30% threshold",
+            "commute_km": round(float(distance), 2),
+            "commute_method": "Haversine straight-line distance",
             "affordable": bool(float(rent) <= affordable_rent),
             "housing_score": round(housing_score, 2),
             "combined_score": round(combined_score, 2),
@@ -368,6 +419,12 @@ def rank_housing_for_job(housing_df: pd.DataFrame, job: pd.Series, profile: dict
         int(profile.get("homes_per_job", 5))
     ).reset_index(drop=True)
 
+def get_available_housing_cities(housing_df: pd.DataFrame) -> list[str]:
+    """Return the Ontario housing centres available in the supplied dataset."""
+    if housing_df.empty or "city" not in housing_df.columns:
+        return []
+    cities = housing_df["city"].dropna().astype(str).str.strip()
+    return sorted(c for c in cities.unique().tolist() if c)
 
 def build_housing_recommendations(
     housing_df: pd.DataFrame,
