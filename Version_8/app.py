@@ -17,8 +17,9 @@ Run with:
 """
 from __future__ import annotations
 
-from dotenv import load_dotenv
-load_dotenv()
+# For Adzuna key
+#from dotenv import load_dotenv
+#load_dotenv()
 
 
 import os
