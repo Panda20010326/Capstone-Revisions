@@ -11,7 +11,15 @@ from math import radians, sin, cos, sqrt, atan2
 from typing import Any
 
 import pandas as pd
-
+# Optional GIS support used to reject housing points that fall in water.
+# The module still runs if GeoPandas/Shapely are not installed.
+try:
+    import geopandas as gpd
+    from shapely.geometry import Point
+                                                    
+except ImportError:
+    gpd = None
+    Point = None
 
 def clean_text(text: Any) -> str:
     text = str(text).lower()
@@ -149,13 +157,13 @@ CITY_LAND_BOUNDS = {
     "hamilton": (43.15, 43.38, -80.15, -79.65),
     "oakville": (43.38, 43.55, -79.82, -79.48),
     "ottawa": (45.20, 45.65, -76.10, -75.40),
-    "oshawa": (43.78, 44.05, -79.10, -78.65),
+    "oshawa": (43.85, 44.05, -79.10, -78.65),
     "barrie": (44.25, 44.55, -79.90, -79.45),
-    "kingston": (44.05, 44.40, -76.75, -76.20),
-    "belleville": (44.00, 44.32, -77.65, -77.15),
-    "windsor": (42.15, 42.48, -83.30, -82.80),
-    "thunder bay": (48.15, 48.60, -89.55, -88.95),
-    "st. catharines": (43.00, 43.30, -79.45, -79.00),
+    "kingston": (44.19, 44.40, -76.75, -76.20),
+    "belleville": (44.12, 44.32, -77.65, -77.15),
+    "windsor": (42.24, 42.36, -83.15, -82.95),
+    "thunder bay": (48.15, 48.60, -89.55, -89.15),
+    "st. catharines": (43.00, 43.22, -79.45, -79.00),
     "brantford": (43.00, 43.28, -80.45, -80.05),
     "greater sudbury": (46.30, 46.70, -81.30, -80.70),
     "guelph": (43.38, 43.70, -80.45, -80.05),
@@ -224,8 +232,86 @@ def _toronto_shoreline_lat(lon: float) -> float:
     return 43.62
 
 
+def _load_canada_land_geometry() -> Any:
+    """
+    Load Natural Earth country geometry through GeoPandas when available.
+    The result is cached on the function so the shapefile is not reloaded
+    for every housing point.
+    """
+    if hasattr(_load_canada_land_geometry, "_cached"):
+        return _load_canada_land_geometry._cached
+
+    if gpd is None:
+        _load_canada_land_geometry._cached = None
+        return None
+
+    try:
+        # GeoPandas provides a built-in Natural Earth low-resolution dataset
+        # in many common installations. If unavailable, we fall back safely.
+        dataset_path = gpd.datasets.get_path("naturalearth_lowres")
+        world = gpd.read_file(dataset_path)
+        canada = world[world["name"].astype(str).str.lower().eq("canada")]
+
+        if canada.empty:
+            _load_canada_land_geometry._cached = None
+            return None
+
+        geom = canada.geometry.unary_union
+        _load_canada_land_geometry._cached = geom
+        return geom
+    except Exception:
+        _load_canada_land_geometry._cached = None
+        return None
+
+def _point_is_on_canadian_land(lat: float, lon: float) -> bool:
+    """
+    Return True when the coordinate is on Canadian land.
+
+                                                                         
+                                                                            
+    If GIS support is unavailable, the existing city bounds / shoreline
+    safeguards remain the fallback.
+    """
+    if not _valid_coordinates(lat, lon):
+        return False
+
+    canada_geom = _load_canada_land_geometry()
+
+    if canada_geom is None or Point is None:
+            
+                                                 
+        return True
+                         
+                
+
+    try:
+        point = Point(float(lon), float(lat))
+        return bool(canada_geom.contains(point) or canada_geom.touches(point))
+    except Exception:
+        return True
+
+
+def _hamilton_harbour_guard(lat: float, lon: float) -> bool:
+    """
+    Extra safeguard for Hamilton Harbour / western Lake Ontario candidate points.
+    """
+    if 43.275 <= lat <= 43.325 and -79.885 <= lon <= -79.755:
+        return False
+
+    if 43.305 <= lat <= 43.365 and -79.790 <= lon <= -79.675:
+        return False
+
+    return True
+
 def _looks_like_land(city: Any, lat: float, lon: float) -> bool:
+    """
+    Validate a housing coordinate before it is used by the recommender/map.
+    """
+    if not _valid_coordinates(lat, lon):
+        return False
+
     city_key = normalize_city(city)
+
     bounds = CITY_LAND_BOUNDS.get(city_key)
     if bounds is not None:
         min_lat, max_lat, min_lon, max_lon = bounds
@@ -235,9 +321,13 @@ def _looks_like_land(city: Any, lat: float, lon: float) -> bool:
     if city_key == "toronto" and lat < _toronto_shoreline_lat(lon):
         return False
 
+    if city_key == "hamilton" and not _hamilton_harbour_guard(lat, lon):
+        return False
+
+    if not _point_is_on_canadian_land(lat, lon):
+        return False
+
     return True
-
-
 def prepare_housing_data(
     housing_df: pd.DataFrame,
     target_city: str | None = None,
