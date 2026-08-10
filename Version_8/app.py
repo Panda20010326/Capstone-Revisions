@@ -15,6 +15,9 @@ Single Streamlit interface that runs the full Capstone Group 4 pipeline:
 Run with:
     streamlit run app.py
 """
+pip install python-dotenv
+
+
 
 from __future__ import annotations
 
